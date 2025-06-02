@@ -4,6 +4,11 @@
     <button @click="startAnimation" :disabled="isAnimating || isLoading">
       {{ isLoading ? "データ取得中..." : isAnimating ? "アニメーション中..." : "アニメーション開始" }}
     </button>
+    <select name="course-select" id="course-select">
+      <option value="Monaco">Monaco</option>
+      <option value="Spain">Spain</option>
+      <option value="Canada">Canada</option>
+    </select>
   </div>
   <div v-if="isLoading" class="spinner-overlay">
     <div class="spinner"></div>
@@ -22,58 +27,84 @@ const isAnimating = ref(false);
 const isLoading = ref(false);
 let circuitImage = new Image();
 
+onMounted(() => {
+  const canvas = canvasRef.value;
+  ctx.value = canvas.getContext("2d");
 
-  onMounted(async () => {
-    const canvas = canvasRef.value;
-    ctx.value = canvas.getContext("2d");
+  // circuitImage.src = circuitPath;
+  circuitImage.onload = () => {
+    console.log("画像読み込み完了");
+    drawCircuit(); // 任意：背景に描く処理（必要なら）
+  };
+});
 
-    circuitImage.src = circuitPath;
 
-    circuitImage.onload = async () => {
-      isLoading.value = true;
-      try {
-        const res = await fetch(
-          "https://api.openf1.org/v1/location?session_key=latest&driver_number=81"
-        );
+async function fetchData() {
+  isLoading.value = true;
 
-        if (!res.ok) {
-          throw new Error(`HTTPエラー: ${res.status}`);
-        }
+  const selectElement = document.getElementById("course-select");
+  const selectedValue = selectElement.value;
+  console.log("選択されたコース:", selectedValue);
 
-        const data = await res.json();
-        console.log("取得したデータ:", data);
-        points.value = data.map((p) => ({ x: p.x, y: p.y }));
-        normalizePoints();
-      } catch (error) {
-        console.error("データの取得に失敗しました:", error);
-        alert("位置情報の取得に失敗しました。ページを再読み込みしてください。");
-      } finally {
-        isLoading.value = false;
-      }
-    };
-  });
+  try {
+    // ① session_key の取得
+    const sessionRes = await fetch(
+      `https://api.openf1.org/v1/sessions?country_name=${selectedValue}&year=2025`
+    );
 
-function normalizePoints() {
-  const xs = points.value.map((p) => p.x);
-  const ys = points.value.map((p) => p.y);
-  const minX = Math.min(...xs),
-    maxX = Math.max(...xs);
-  const minY = Math.min(...ys),
-    maxY = Math.max(...ys);
+    if (!sessionRes.ok) {
+      throw new Error(`Session API エラー: ${sessionRes.status}`);
+    }
 
-  const scaleX = 800 / (maxX - minX);
-  const scaleY = 600 / (maxY - minY);
+    const sessionData = await sessionRes.json();
 
-  points.value = points.value.map((p) => ({
-    x: (p.x - minX) * scaleX,
-    y: 600 - (p.y - minY) * scaleY, // Y反転
-  }));
+    if (!sessionData.length) {
+      throw new Error("指定された条件に一致するセッションが見つかりません。");
+    }
+
+    const sessionKey = sessionData[0].session_key;
+    console.log("取得した session_key:", sessionKey);
+
+    // ② 位置情報の取得
+    const locationRes = await fetch(
+      `https://api.openf1.org/v1/location?session_key=${sessionKey}&driver_number=81`
+    );
+
+    if (!locationRes.ok) {
+      throw new Error(`Location API エラー: ${locationRes.status}`);
+    }
+
+    const locationData = await locationRes.json();
+    console.log("取得したデータ:", locationData);
+
+    points.value = locationData.map((p) => ({ x: p.x, y: p.y }));
+    normalizePoints();
+  } catch (error) {
+    console.error("データの取得に失敗しました:", error);
+    alert("データの取得に失敗しました。ページを再読み込みしてください。");
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+
+async function startAnimation() {
+  console.log("アニメーション開始");
+  await fetchData(); // 画像と無関係にAPIだけ実行
+  if (points.value.length === 0) return;
+  index = 0;
+  isAnimating.value = true;
+  animate();
+}
+
+// 背景画像を描画
+function drawCircuit() {
+  ctx.value.clearRect(0, 0, 800, 600);
+  ctx.value.drawImage(circuitImage, 0, 0, 800, 600);
 }
 
 function animate() {
-  ctx.value.clearRect(0, 0, 800, 600);
-  ctx.value.drawImage(circuitImage, 0, 0, 800, 600);
-
+  drawCircuit(); 
   if (index > 0) {
     ctx.value.beginPath();
     ctx.value.moveTo(points.value[0].x, points.value[0].y);
@@ -96,21 +127,28 @@ function animate() {
   }
 
   if (index < points.value.length) {
-    setTimeout(animate, 0.001);
+    setTimeout(animate, 0.0001);
   } else {
     isAnimating.value = false;
   }
 }
 
+function normalizePoints() {
+  const xs = points.value.map((p) => p.x);
+  const ys = points.value.map((p) => p.y);
+  const minX = Math.min(...xs),
+    maxX = Math.max(...xs);
+  const minY = Math.min(...ys),
+    maxY = Math.max(...ys);
 
-function startAnimation() {
-  console.log("アニメーション開始");
-  if (points.length === 0) return;
-  index = 0;
-  isAnimating.value = true;
-  animate();
+  const scaleX = 800 / (maxX - minX);
+  const scaleY = 600 / (maxY - minY);
+
+  points.value = points.value.map((p) => ({
+    x: (p.x - minX) * scaleX,
+    y: 600 - (p.y - minY) * scaleY,
+  }));
 }
-
 </script>
 
 <style scoped>
