@@ -1,8 +1,8 @@
 <template>
   <canvas ref="canvasRef" width="800" height="600"></canvas>
   <div class="button-container">
-    <button @click="startAnimation" :disabled="isAnimating">
-      Start Animation
+    <button @click="startAnimation" :disabled="isAnimating || isLoading">
+      {{ isLoading ? "データ取得中..." : isAnimating ? "アニメーション中..." : "アニメーション開始" }}
     </button>
   </div>
   <div v-if="isLoading" class="spinner-overlay">
@@ -128,8 +128,8 @@ button {
   position: absolute;
   top: 0;
   left: 0;
-  width: 800px;
-  height: 600px;
+  width: 100vw;
+  height: 100vh;
   background: rgba(255, 255, 255, 0.7);
   display: flex;
   justify-content: center;
