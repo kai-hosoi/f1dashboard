@@ -1,7 +1,7 @@
 <template>
   <canvas ref="canvasRef" width="800" height="600"></canvas>
   <div class="button-container">
-    <button @click="StartAnimation" :disabled="isAnimating">
+    <button @click="startAnimation" :disabled="isAnimating">
       Start Animation
     </button>
   </div>
@@ -23,94 +23,94 @@ const isLoading = ref(false);
 let circuitImage = new Image();
 
 
-onMounted(async () => {
+  onMounted(async () => {
     const canvas = canvasRef.value;
     ctx.value = canvas.getContext("2d");
 
-    circuitImage.src = circuitPath; // 画像パス（public/img/circuit.png などに配置）
+    circuitImage.src = circuitPath;
 
     circuitImage.onload = async () => {
-        isLoading.value = true; // ← API前にtrue
-        try {
-          const res = await fetch(
-            "https://api.openf1.org/v1/location?session_key=latest&driver_number=81"
-          );
+      isLoading.value = true;
+      try {
+        const res = await fetch(
+          "https://api.openf1.org/v1/location?session_key=latest&driver_number=81"
+        );
 
-          if (!res.ok) {
-            // レスポンスがエラー（例: 404, 500）
-            throw new Error(`HTTPエラー: ${res.status}`);
-          }
-
-          const data = await res.json();
-          console.log("取得したデータ:", data);
-          points.value = data.map((p) => ({ x: p.x, y: p.y }));
-
-          normalizePoints();
-        } catch (error) {
-          console.error("データの取得に失敗しました:", error);
-          alert("位置情報の取得に失敗しました。ページを再読み込みしてください。");
-        } finally {
-          isLoading.value = false;
+        if (!res.ok) {
+          throw new Error(`HTTPエラー: ${res.status}`);
         }
+
+        const data = await res.json();
+        console.log("取得したデータ:", data);
+        points.value = data.map((p) => ({ x: p.x, y: p.y }));
+        normalizePoints();
+      } catch (error) {
+        console.error("データの取得に失敗しました:", error);
+        alert("位置情報の取得に失敗しました。ページを再読み込みしてください。");
+      } finally {
+        isLoading.value = false;
+      }
     };
-});
+  });
 
-  function normalizePoints() {
-      const xs = points.map((p) => p.x);
-      const ys = points.map((p) => p.y);
-      const minX = Math.min(...xs),
-          maxX = Math.max(...xs);
-      const minY = Math.min(...ys),
-          maxY = Math.max(...ys);
+function normalizePoints() {
+  const xs = points.value.map((p) => p.x);
+  const ys = points.value.map((p) => p.y);
+  const minX = Math.min(...xs),
+    maxX = Math.max(...xs);
+  const minY = Math.min(...ys),
+    maxY = Math.max(...ys);
 
-      const scaleX = 800 / (maxX - minX);
-      const scaleY = 600 / (maxY - minY);
+  const scaleX = 800 / (maxX - minX);
+  const scaleY = 600 / (maxY - minY);
 
-      points.value = points.map((p) => ({
-          x: (p.x - minX) * scaleX,
-          y: 600 - (p.y - minY) * scaleY, // Y反転
-      }));
+  points.value = points.value.map((p) => ({
+    x: (p.x - minX) * scaleX,
+    y: 600 - (p.y - minY) * scaleY, // Y反転
+  }));
+}
+
+function animate() {
+  ctx.value.clearRect(0, 0, 800, 600);
+  ctx.value.drawImage(circuitImage, 0, 0, 800, 600);
+
+  if (index > 0) {
+    ctx.value.beginPath();
+    ctx.value.moveTo(points.value[0].x, points.value[0].y);
+    for (let i = 1; i <= index; i++) {
+      ctx.value.lineTo(points.value[i].x, points.value[i].y);
+    }
+    ctx.value.strokeStyle = "blue";
+    ctx.value.stroke();
   }
 
-  function animate() {
-    // 背景画像を描画
-    ctx.clearRect(0, 0, 800, 600);
-    ctx.drawImage(circuitImage, 0, 0, 800, 600);
+  const current = points.value[index];
+  ctx.value.beginPath();
+  ctx.value.arc(current.x, current.y, 4, 0, 2 * Math.PI);
+  ctx.value.fillStyle = "orange";
+  ctx.value.fill();
 
-    if (index > 0) {
-        ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i <= index; i++) {
-            ctx.lineTo(points[i].x, points[i].y);
-        }
-        ctx.strokeStyle = "blue";
-        ctx.stroke();
-    }
-
-    const current = points[index];
-    ctx.beginPath();
-    ctx.arc(current.x, current.y, 4, 0, 2 * Math.PI);
-    ctx.fillStyle = "orange";
-    ctx.fill();
-
-    index++;
-    if (index % 100 === 0) {
-        // 100ポイントごとにログ出力
-        console.log(`現在のインデックス: ${index}, ポイント数: ${points.length}`);
-    }
-
-    if (index < points.length) {
-        setTimeout(animate,0.001);
-    }else{
-      isAnimating.value = false; // 終了時ボタンを再度使えるように
-    }
+  index++;
+  if (index % 100 === 0) {
+    console.log(`現在のインデックス: ${index}, ポイント数: ${points.value.length}`);
   }
-  function startAnimation() {
-    if (points.length === 0) return;
-    index = 0;
-    isAnimating.value = true;
-    animate();
+
+  if (index < points.value.length) {
+    setTimeout(animate, 0.001);
+  } else {
+    isAnimating.value = false;
   }
+}
+
+
+function startAnimation() {
+  console.log("アニメーション開始");
+  if (points.length === 0) return;
+  index = 0;
+  isAnimating.value = true;
+  animate();
+}
+
 </script>
 
 <style scoped>
