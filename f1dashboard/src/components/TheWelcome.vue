@@ -4,7 +4,7 @@
     <button @click="startAnimation" :disabled="isAnimating || isLoading">
       {{ isLoading ? "データ取得中..." : isAnimating ? "アニメーション中..." : "アニメーション開始" }}
     </button>
-    <select name="course-select" id="course-select">
+    <select name="course-select" id="course-select" @change="changeCircuite">
       <option value="Monaco">Monaco</option>
       <option value="Spain">Spain</option>
       <option value="Canada">Canada</option>
@@ -17,7 +17,9 @@
 
 <script setup>
 import { ref, onMounted } from "vue";
-import circuitPath from "@/assets/circuit.png";
+import Monacocircuit from "@/assets/Monacocircuit.png";
+import Spaincircuit from "@/assets/Spaincircuit.png";
+import Canadacircuit from "@/assets/Canadacircuit.png";
 
 const canvasRef = ref(null);
 const ctx = ref(null);
@@ -31,12 +33,27 @@ onMounted(() => {
   const canvas = canvasRef.value;
   ctx.value = canvas.getContext("2d");
 
-  // circuitImage.src = circuitPath;
+  circuitImage.src = Monacocircuit;
   circuitImage.onload = () => {
     console.log("画像読み込み完了");
     drawCircuit(); // 任意：背景に描く処理（必要なら）
   };
 });
+
+function changeCircuite(){
+  const selectElement = document.getElementById("course-select");
+  const selectedValue = selectElement.value;
+  console.log("選択されたコース:", selectedValue);
+
+  if(selectedValue === "Monaco"){
+    circuitImage.src = Monacocircuit;
+  }else if(selectedValue === "Spain"){
+    circuitImage.src = Spaincircuit;
+  }else if(selectedValue === "Canada"){
+    circuitImage.src = Canadacircuit;
+  }
+  drawCircuit();
+}
 
 
 async function fetchData() {
@@ -99,8 +116,39 @@ async function startAnimation() {
 
 // 背景画像を描画
 function drawCircuit() {
-  ctx.value.clearRect(0, 0, 800, 600);
-  ctx.value.drawImage(circuitImage, 0, 0, 800, 600);
+  const canvasWidth = 800;
+  const canvasHeight = 600;
+
+  // コース線のバウンディングボックスを取得
+  const xs = points.value.map(p => p.x);
+  const ys = points.value.map(p => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+
+  const trackWidth = maxX - minX;
+  const trackHeight = maxY - minY;
+
+  // 背景画像サイズ
+  const imgWidth = 1200;
+  const imgHeight = 750;
+
+  // 背景画像をコース線に合わせてスケーリング
+  const scaleX = trackWidth / imgWidth;
+  const scaleY = trackHeight / imgHeight;
+  const scale = Math.max(scaleX, scaleY); // 全体が覆えるようにスケーリング
+
+  const drawWidth = imgWidth * scale;
+  const drawHeight = imgHeight * scale;
+
+  // 背景の左上座標（線のminX, minYに合わせて描画開始）
+  const offsetX = minX - (drawWidth - trackWidth) / 2;
+  const offsetY = minY - (drawHeight - trackHeight) / 2;
+
+  // 背景画像を描画
+  ctx.value.clearRect(0, 0, canvasWidth, canvasHeight);
+  ctx.value.drawImage(circuitImage, offsetX, offsetY, drawWidth, drawHeight);
 }
 
 function animate() {
@@ -134,21 +182,49 @@ function animate() {
 }
 
 function normalizePoints() {
+  const canvasWidth = 800;
+  const canvasHeight = 600;
+
   const xs = points.value.map((p) => p.x);
   const ys = points.value.map((p) => p.y);
-  const minX = Math.min(...xs),
-    maxX = Math.max(...xs);
-  const minY = Math.min(...ys),
-    maxY = Math.max(...ys);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
 
-  const scaleX = 800 / (maxX - minX);
-  const scaleY = 600 / (maxY - minY);
+  const trackWidth = maxX - minX;
+  const trackHeight = maxY - minY;
 
-  points.value = points.value.map((p) => ({
-    x: (p.x - minX) * scaleX,
-    y: 600 - (p.y - minY) * scaleY,
-  }));
+  // 背景画像（＝キャンバス）に合わせたスケーリング
+  const scale = Math.min(canvasWidth / trackWidth, canvasHeight / trackHeight);
+
+  // トラック中心（元データ）
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+
+  // 背景画像中心（キャンバス中心）
+  const canvasCenterX = canvasWidth / 2;
+  const canvasCenterY = canvasHeight / 2;
+
+  // 調整した回転角（必要に応じて ± 調整）
+  const angle = (-45 * Math.PI) / 180;
+
+  // 正規化・回転・スケーリング・中央寄せ処理
+  points.value = points.value.map((p) => {
+    const x = (p.x - centerX);
+    const y = (p.y - centerY);
+
+    const rotatedX = x * Math.cos(angle) - y * Math.sin(angle);
+    const rotatedY = x * Math.sin(angle) + y * Math.cos(angle);
+
+    return {
+      x: canvasCenterX + rotatedX * scale,
+      y: canvasCenterY - rotatedY * scale, // Y反転
+    };
+  });
 }
+
+
+
+
 </script>
 
 <style scoped>
