@@ -9,6 +9,9 @@
       <option value="Spain">Spain</option>
       <option value="Canada">Canada</option>
     </select>
+    <p v-if="currentTime" style="font-size: 18px; margin-top: 10px;">
+      現在の時刻: {{ currentTime }}
+    </p>
   </div>
   <div v-if="isLoading" class="spinner-overlay">
     <div class="spinner"></div>
@@ -28,6 +31,7 @@ let index = 0;
 const isAnimating = ref(false);
 const isLoading = ref(false);
 let circuitImage = new Image();
+const currentTime = ref("")
 
 onMounted(() => {
   const canvas = canvasRef.value;
@@ -93,8 +97,11 @@ async function fetchData() {
 
     const locationData = await locationRes.json();
     console.log("取得したデータ:", locationData);
+    console.log(locationData[0].date)
 
-    points.value = locationData.map((p) => ({ x: p.x, y: p.y }));
+    points.value = locationData.map((p) => {
+      // console.log("p.date:", p.date);
+      return {x: p.x, y: p.y, time: p.date}});
     normalizePoints();
   } catch (error) {
     console.error("データの取得に失敗しました:", error);
@@ -164,6 +171,8 @@ function animate() {
   }
 
   const current = points.value[index];
+  const fixedTimeStr = String(current.time).replace(/\.\d{6}/, "").replace("+00:00", "Z");
+  currentTime.value = new Date(fixedTimeStr).toLocaleString();
   ctx.value.beginPath();
   ctx.value.arc(current.x, current.y, 4, 0, 2 * Math.PI);
   ctx.value.fillStyle = "orange";
@@ -205,7 +214,7 @@ function normalizePoints() {
   const canvasCenterY = canvasHeight / 2;
 
   // 調整した回転角（必要に応じて ± 調整）
-  const angle = (-45 * Math.PI) / 180;
+  const angle = (-58 * Math.PI) / 180;
 
   // 正規化・回転・スケーリング・中央寄せ処理
   points.value = points.value.map((p) => {
@@ -217,7 +226,8 @@ function normalizePoints() {
 
     return {
       x: canvasCenterX + rotatedX * scale,
-      y: canvasCenterY - rotatedY * scale, // Y反転
+      y: canvasCenterY - rotatedY * scale,
+      time: p.time // Y反転
     };
   });
 }
